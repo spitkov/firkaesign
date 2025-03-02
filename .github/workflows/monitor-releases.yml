@@ -2,7 +2,7 @@ name: Monitor IPA Repository Releases
 
 on:
   schedule:
-    - cron: '* * * * *'  # Run every minute
+    - cron: '*/5 * * * *'  # Run every 5 minutes (minimum GitHub allows)
   workflow_dispatch:  # Keep manual trigger for testing
 
 jobs:
