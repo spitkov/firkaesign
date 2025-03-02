@@ -1,0 +1,26 @@
+name: 📅 Schedule IPA Check
+
+on:
+  schedule:
+    - cron: '0 */1 * * *' # Run every hour
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Date to run the workflow'
+        required: true
+        type: string
+        default: 'in 1 minute'
+
+jobs:
+  schedule:
+    name: Schedule IPA Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: austenstone/schedule@v1.3
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          date: ${{ github.event.inputs.date }}
+          workflow: 'check-ipa.yml'
+          wait-ms: 45000  # Check for 45 seconds
+          wait-delay-ms: 60000  # Wait 1 minute between checks
+          timezone: 'UTC' 
