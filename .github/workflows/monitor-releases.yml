@@ -2,9 +2,8 @@ name: Monitor IPA Repository Releases
 
 on:
   schedule:
-    # Check every 15 minutes
-    - cron: '*/15 * * * *'
-  workflow_dispatch:  # Allow manual trigger
+    - cron: '* * * * *'  # Run every minute
+  workflow_dispatch:  # Keep manual trigger for testing
 
 jobs:
   check-ipa-releases:
@@ -13,17 +12,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          repository: 'spitkov/firkaesign'
           token: ${{ secrets.PAT_TOKEN }}
 
       - name: Check for new IPA releases
         id: check_releases
-        env:
-          OWNER: 'spitkov'
-          REPO: 'firkatest'
         run: |
-          # Get the latest release from the repository
-          LATEST_RELEASE=$(curl -s "https://api.github.com/repos/$OWNER/$REPO/releases/latest")
+          # Get the latest release
+          LATEST_RELEASE=$(curl -s "https://api.github.com/repos/QwIT-Development/app-legacy/releases/latest")
           
           # Extract release information
           TAG_NAME=$(echo $LATEST_RELEASE | jq -r .tag_name)
@@ -44,23 +39,26 @@ jobs:
             # Format date for version date
             VERSION_DATE=$(date -d "$PUBLISHED_AT" +"%Y-%m-%dT%H:%M:%S%z")
             
-            # Store the information
-            echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-            echo "published=$VERSION_DATE" >> $GITHUB_OUTPUT
-            echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
-            echo "size=$SIZE_MB" >> $GITHUB_OUTPUT
-            echo "description=$BODY" >> $GITHUB_OUTPUT
-            
             # Check if this is a new version
             if [ ! -f .last_processed_ipa ]; then
               echo $TAG_NAME > .last_processed_ipa
+              echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+              echo "published=$VERSION_DATE" >> $GITHUB_OUTPUT
+              echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+              echo "size=$SIZE_MB" >> $GITHUB_OUTPUT
+              echo "description=$BODY" >> $GITHUB_OUTPUT
               echo "is_new=true" >> $GITHUB_OUTPUT
             else
               LAST_PROCESSED=$(cat .last_processed_ipa)
               if [ "$TAG_NAME" != "$LAST_PROCESSED" ]; then
                 echo "New IPA release detected!"
-                echo "is_new=true" >> $GITHUB_OUTPUT
                 echo $TAG_NAME > .last_processed_ipa
+                echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+                echo "published=$VERSION_DATE" >> $GITHUB_OUTPUT
+                echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+                echo "size=$SIZE_MB" >> $GITHUB_OUTPUT
+                echo "description=$BODY" >> $GITHUB_OUTPUT
+                echo "is_new=true" >> $GITHUB_OUTPUT
               else
                 echo "No new IPA release"
                 echo "is_new=false" >> $GITHUB_OUTPUT
@@ -116,7 +114,6 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/spitkov/firkaesign.git
           git add apps.json
           git commit -m "Update apps.json with new IPA release ${{ steps.check_releases.outputs.tag }}" || exit 0
           git push 
