@@ -17,21 +17,26 @@ jobs:
       - name: Check for new IPA releases
         id: check_releases
         run: |
+          # Function to sanitize output
+          sanitize_output() {
+            echo "$1" | tr -d '\r' | tr -d '\n'
+          }
+
           # Get the latest release
           LATEST_RELEASE=$(curl -s "https://api.github.com/repos/QwIT-Development/app-legacy/releases/latest")
           
           # Check if there are any releases
           if [ "$(echo $LATEST_RELEASE | jq -r 'if type=="object" then "yes" else "no" end')" != "yes" ]; then
             echo "No releases found in repository"
-            echo "is_new=false" >> $GITHUB_OUTPUT
+            echo "is_new=$(sanitize_output false)" >> $GITHUB_OUTPUT
             exit 0
           fi
           
           # Extract release information
           TAG_NAME=$(echo $LATEST_RELEASE | jq -r .tag_name)
           PUBLISHED_AT=$(echo $LATEST_RELEASE | jq -r .published_at)
-          # Properly escape the body content
-          BODY=$(echo $LATEST_RELEASE | jq -r .body | jq -sR)
+          # Get description and escape it properly for JSON
+          BODY=$(echo $LATEST_RELEASE | jq -r .body | jq -Rs .)
           
           # Find IPA asset
           IPA_ASSET=$(echo $LATEST_RELEASE | jq -r '.assets[]? | select(.name | endswith(".ipa"))')
@@ -50,31 +55,31 @@ jobs:
             # Check if this is a new version
             if [ ! -f .last_processed_ipa ]; then
               echo $TAG_NAME > .last_processed_ipa
-              echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-              echo "published=$VERSION_DATE" >> $GITHUB_OUTPUT
-              echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
-              echo "size=$SIZE_MB" >> $GITHUB_OUTPUT
-              echo "description=${BODY}" >> $GITHUB_OUTPUT
-              echo "is_new=true" >> $GITHUB_OUTPUT
+              echo "tag=$(sanitize_output $TAG_NAME)" >> $GITHUB_OUTPUT
+              echo "published=$(sanitize_output $VERSION_DATE)" >> $GITHUB_OUTPUT
+              echo "download_url=$(sanitize_output $DOWNLOAD_URL)" >> $GITHUB_OUTPUT
+              echo "size=$(sanitize_output $SIZE_MB)" >> $GITHUB_OUTPUT
+              echo "description=$(sanitize_output $BODY)" >> $GITHUB_OUTPUT
+              echo "is_new=$(sanitize_output true)" >> $GITHUB_OUTPUT
             else
               LAST_PROCESSED=$(cat .last_processed_ipa)
               if [ "$TAG_NAME" != "$LAST_PROCESSED" ]; then
                 echo "New IPA release detected!"
                 echo $TAG_NAME > .last_processed_ipa
-                echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-                echo "published=$VERSION_DATE" >> $GITHUB_OUTPUT
-                echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
-                echo "size=$SIZE_MB" >> $GITHUB_OUTPUT
-                echo "description=${BODY}" >> $GITHUB_OUTPUT
-                echo "is_new=true" >> $GITHUB_OUTPUT
+                echo "tag=$(sanitize_output $TAG_NAME)" >> $GITHUB_OUTPUT
+                echo "published=$(sanitize_output $VERSION_DATE)" >> $GITHUB_OUTPUT
+                echo "download_url=$(sanitize_output $DOWNLOAD_URL)" >> $GITHUB_OUTPUT
+                echo "size=$(sanitize_output $SIZE_MB)" >> $GITHUB_OUTPUT
+                echo "description=$(sanitize_output $BODY)" >> $GITHUB_OUTPUT
+                echo "is_new=$(sanitize_output true)" >> $GITHUB_OUTPUT
               else
                 echo "No new IPA release"
-                echo "is_new=false" >> $GITHUB_OUTPUT
+                echo "is_new=$(sanitize_output false)" >> $GITHUB_OUTPUT
               fi
             fi
           else
             echo "No IPA asset found in release"
-            echo "is_new=false" >> $GITHUB_OUTPUT
+            echo "is_new=$(sanitize_output false)" >> $GITHUB_OUTPUT
           fi
 
       - name: Update apps.json
