@@ -84,6 +84,7 @@ jobs:
 
       - name: Update apps.json
         if: steps.check_releases.outputs.is_new == 'true'
+        shell: bash
         run: |
           # Read existing JSON file
           if [ ! -f apps.json ]; then
@@ -97,11 +98,11 @@ jobs:
           fi
           
           # Create new app entry using jq to ensure proper JSON formatting
-          jq -n --arg tag "${{ steps.check_releases.outputs.tag }}" \
-             --arg date "${{ steps.check_releases.outputs.published }}" \
-             --arg desc "${{ steps.check_releases.outputs.description }}" \
-             --arg url "${{ steps.check_releases.outputs.download_url }}" \
-             --arg size "${{ steps.check_releases.outputs.size }}" \
+          jq -n --arg tag "v5.1.5" \
+             --arg date "2025-02-28T16:03:26+0000" \
+             --arg desc "## Változások\r\n*` reFilc feliratok átírva Firkára\r\n*` Firkát mutat az app az előzményekben (#5)\r\n+` Törölhető feladatok (nyomd hosszan)\r\n+` Új színek\r\n+` Anoním mód téma megosztásnál (nevedet \"Anonymous\"-ra állítja)\r\n+` IPhone telefon crash javítva (#6)\r\n*` Kicsit optimizáltabb témák és jegyzetek oldal\r\n-` Néhány fölösleges betűtípus eltávolítva (Google Fonts csomag leváltja)\r\n-` Fölösleges képek eltávolítva\r\n*` Meglepetés jegy animáció picit meggyorsítva\r\n-` Rive és Lottie animáció libek eltávolítva (kisebb méret)\r\n\r\n#5 -> @jkacsa01\r\n#6 -> @THE-SIMPLE-MARK \r\n\r\n**Teljes commit lista**: https://github.com/QwIT-Development/app-legacy/compare/v5.1.4...v5.1.5\r\n\r\n**IPA telepítés**:\r\n- [Esign](https://github.com/iOS17/Esign)\r\n- [AltStore](https://altstore.io/#Downloads)\r\n\r\n**[F-Droid repo](https://fdroid.qwit.cloud/repo/?fingerprint=62F5F6410F587AF55BDB2BB86E15796F81322DD506011830E4595E83BD5BF87F)**\r\nAjánlott F-Droid kliens: [Droid-ify](https://github.com/Droid-ify/client/releases/latest)" \
+             --arg url "https://github.com/QwIT-Development/app-legacy/releases/download/v5.1.5/firkaapp.ipa" \
+             --arg size "34.36" \
              '{
                "name": "Firka",
                "bundleIdentifier": "app.firka.legacy",
@@ -132,4 +133,4 @@ jobs:
           git config --local user.name "GitHub Action"
           git add apps.json
           git commit -m "Update apps.json with new IPA release ${{ steps.check_releases.outputs.tag }}" || exit 0
-          git push 
+          git push
