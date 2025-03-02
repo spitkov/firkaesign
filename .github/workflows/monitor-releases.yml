@@ -36,7 +36,7 @@ jobs:
           TAG_NAME=$(echo $LATEST_RELEASE | jq -r .tag_name)
           PUBLISHED_AT=$(echo $LATEST_RELEASE | jq -r .published_at)
           # Get description and escape it properly for JSON
-          BODY=$(echo $LATEST_RELEASE | jq -r .body | jq -Rs .)
+          BODY=$(echo $LATEST_RELEASE | jq -r .body | jq -Rs)
           
           # Find IPA asset
           IPA_ASSET=$(echo $LATEST_RELEASE | jq -r '.assets[]? | select(.name | endswith(".ipa"))')
@@ -59,7 +59,7 @@ jobs:
               echo "published=$(sanitize_output $VERSION_DATE)" >> $GITHUB_OUTPUT
               echo "download_url=$(sanitize_output $DOWNLOAD_URL)" >> $GITHUB_OUTPUT
               echo "size=$(sanitize_output $SIZE_MB)" >> $GITHUB_OUTPUT
-              echo "description=$(sanitize_output $BODY)" >> $GITHUB_OUTPUT
+              echo "description=$BODY" >> $GITHUB_OUTPUT
               echo "is_new=$(sanitize_output true)" >> $GITHUB_OUTPUT
             else
               LAST_PROCESSED=$(cat .last_processed_ipa)
@@ -70,7 +70,7 @@ jobs:
                 echo "published=$(sanitize_output $VERSION_DATE)" >> $GITHUB_OUTPUT
                 echo "download_url=$(sanitize_output $DOWNLOAD_URL)" >> $GITHUB_OUTPUT
                 echo "size=$(sanitize_output $SIZE_MB)" >> $GITHUB_OUTPUT
-                echo "description=$(sanitize_output $BODY)" >> $GITHUB_OUTPUT
+                echo "description=$BODY" >> $GITHUB_OUTPUT
                 echo "is_new=$(sanitize_output true)" >> $GITHUB_OUTPUT
               else
                 echo "No new IPA release"
@@ -96,29 +96,32 @@ jobs:
             }' > apps.json
           fi
           
-          # Create new app entry
-          NEW_APP=$(cat << EOF
-          {
-            "name": "Firka",
-            "bundleIdentifier": "app.firka.legacy",
-            "developerName": "QwIT-Development",
-            "version": "${{ steps.check_releases.outputs.tag }}",
-            "versionDate": "${{ steps.check_releases.outputs.published }}",
-            "versionDescription": ${{ steps.check_releases.outputs.description }},
-            "downloadURL": "${{ steps.check_releases.outputs.download_url }}",
-            "localizedDescription": "Firka App",
-            "iconURL": "https://github.com/QwIT-Development/app-legacy/blob/master/refilc/assets/icons/ic_android.png?raw=true",
-            "tintColor": "018084",
-            "isLanZouCloud": 0,
-            "size": ${{ steps.check_releases.outputs.size }},
-            "type": 1
-          }
-          EOF
-          )
+          # Create new app entry using jq to ensure proper JSON formatting
+          jq -n --arg tag "${{ steps.check_releases.outputs.tag }}" \
+             --arg date "${{ steps.check_releases.outputs.published }}" \
+             --arg desc "${{ steps.check_releases.outputs.description }}" \
+             --arg url "${{ steps.check_releases.outputs.download_url }}" \
+             --arg size "${{ steps.check_releases.outputs.size }}" \
+             '{
+               "name": "Firka",
+               "bundleIdentifier": "app.firka.legacy",
+               "developerName": "QwIT-Development",
+               "version": $tag,
+               "versionDate": $date,
+               "versionDescription": $desc,
+               "downloadURL": $url,
+               "localizedDescription": "Firka App",
+               "iconURL": "https://github.com/QwIT-Development/app-legacy/blob/master/refilc/assets/icons/ic_android.png?raw=true",
+               "tintColor": "018084",
+               "isLanZouCloud": 0,
+               "size": ($size | tonumber),
+               "type": 1
+             }' > new_app.json
           
           # Add new app to the beginning of the apps array
-          jq --arg new_app "$NEW_APP" '.apps = ([($new_app | fromjson)] + .apps)' apps.json > apps.json.tmp
+          jq -s '.[0].apps = ([.[1]] + .[0].apps) | .[0]' apps.json new_app.json > apps.json.tmp
           mv apps.json.tmp apps.json
+          rm new_app.json
 
       - name: Commit and push if changed
         if: steps.check_releases.outputs.is_new == 'true'
