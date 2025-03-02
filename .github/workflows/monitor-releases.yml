@@ -90,6 +90,13 @@ jobs:
             echo '{"name":"Firka","identifier":"app.firka.legacy","sourceURL":"https://git.spitkov.hu/spitkov/firkaipa","apps":[]}' > apps.json
           fi
           
+          # Check if version already exists in apps.json
+          VERSION_EXISTS=$(jq --arg version "${{ steps.check_releases.outputs.tag }}" '.apps[] | select(.version == $version) | .version' apps.json)
+          if [ ! -z "$VERSION_EXISTS" ]; then
+            echo "Version ${{ steps.check_releases.outputs.tag }} already exists in apps.json"
+            exit 0
+          fi
+          
           # Create new app entry
           jq -n \
             --arg tag "${{ steps.check_releases.outputs.tag }}" \
