@@ -1,7 +1,9 @@
 name: Check IPA Release
 
 on:
-  workflow_dispatch:  # Only triggered by scheduler or manual runs
+  schedule:
+    - cron: '* * * * *'  # Run every minute
+  workflow_dispatch:  # Keep manual trigger for testing
 
 jobs:
   check-ipa-releases:
