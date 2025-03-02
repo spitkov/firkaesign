@@ -30,7 +30,8 @@ jobs:
           # Extract release information
           TAG_NAME=$(echo $LATEST_RELEASE | jq -r .tag_name)
           PUBLISHED_AT=$(echo $LATEST_RELEASE | jq -r .published_at)
-          BODY=$(echo $LATEST_RELEASE | jq -r .body)
+          # Properly escape the body content
+          BODY=$(echo $LATEST_RELEASE | jq -r .body | jq -sR)
           
           # Find IPA asset
           IPA_ASSET=$(echo $LATEST_RELEASE | jq -r '.assets[]? | select(.name | endswith(".ipa"))')
@@ -53,7 +54,7 @@ jobs:
               echo "published=$VERSION_DATE" >> $GITHUB_OUTPUT
               echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
               echo "size=$SIZE_MB" >> $GITHUB_OUTPUT
-              echo "description=$BODY" >> $GITHUB_OUTPUT
+              echo "description=${BODY}" >> $GITHUB_OUTPUT
               echo "is_new=true" >> $GITHUB_OUTPUT
             else
               LAST_PROCESSED=$(cat .last_processed_ipa)
@@ -64,7 +65,7 @@ jobs:
                 echo "published=$VERSION_DATE" >> $GITHUB_OUTPUT
                 echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
                 echo "size=$SIZE_MB" >> $GITHUB_OUTPUT
-                echo "description=$BODY" >> $GITHUB_OUTPUT
+                echo "description=${BODY}" >> $GITHUB_OUTPUT
                 echo "is_new=true" >> $GITHUB_OUTPUT
               else
                 echo "No new IPA release"
@@ -98,7 +99,7 @@ jobs:
             "developerName": "QwIT-Development",
             "version": "${{ steps.check_releases.outputs.tag }}",
             "versionDate": "${{ steps.check_releases.outputs.published }}",
-            "versionDescription": "${{ steps.check_releases.outputs.description }}",
+            "versionDescription": ${{ steps.check_releases.outputs.description }},
             "downloadURL": "${{ steps.check_releases.outputs.download_url }}",
             "localizedDescription": "Firka App",
             "iconURL": "https://github.com/QwIT-Development/app-legacy/blob/master/refilc/assets/icons/ic_android.png?raw=true",
