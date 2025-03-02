@@ -23,7 +23,7 @@ jobs:
           }
 
           # Get the latest release
-          LATEST_RELEASE=$(curl -s "https://api.github.com/repos/QwIT-Development/app-legacy/releases/latest")
+          LATEST_RELEASE=$(curl -s "https://api.github.com/repos/spitkov/firkatest/releases/latest")
           
           # Check if there are any releases
           if [ "$(echo $LATEST_RELEASE | jq -r 'if type=="object" then "yes" else "no" end')" != "yes" ]; then
@@ -36,7 +36,7 @@ jobs:
           TAG_NAME=$(echo $LATEST_RELEASE | jq -r .tag_name)
           PUBLISHED_AT=$(echo $LATEST_RELEASE | jq -r .published_at)
           # Get description and escape it properly for JSON
-          BODY=$(echo $LATEST_RELEASE | jq -r .body | jq -Rs)
+          BODY=$(echo $LATEST_RELEASE | jq -r .body | jq -Rs | sed 's/^"\(.*\)"$/\1/')
           
           # Find IPA asset
           IPA_ASSET=$(echo $LATEST_RELEASE | jq -r '.assets[]? | select(.name | endswith(".ipa"))')
@@ -91,21 +91,27 @@ jobs:
           fi
           
           # Create new app entry
-          echo '{
-            "name": "Firka",
-            "bundleIdentifier": "app.firka.legacy",
-            "developerName": "QwIT-Development",
-            "version": "${{ steps.check_releases.outputs.tag }}",
-            "versionDate": "${{ steps.check_releases.outputs.published }}",
-            "versionDescription": ${{ steps.check_releases.outputs.description }},
-            "downloadURL": "${{ steps.check_releases.outputs.download_url }}",
-            "localizedDescription": "Firka App",
-            "iconURL": "https://github.com/QwIT-Development/app-legacy/blob/master/refilc/assets/icons/ic_android.png?raw=true",
-            "tintColor": "018084",
-            "isLanZouCloud": 0,
-            "size": ${{ steps.check_releases.outputs.size }},
-            "type": 1
-          }' > new_app.json
+          jq -n \
+            --arg tag "${{ steps.check_releases.outputs.tag }}" \
+            --arg date "${{ steps.check_releases.outputs.published }}" \
+            --arg desc "${{ steps.check_releases.outputs.description }}" \
+            --arg url "${{ steps.check_releases.outputs.download_url }}" \
+            --arg size "${{ steps.check_releases.outputs.size }}" \
+            '{
+              "name": "Firka",
+              "bundleIdentifier": "app.firka.legacy",
+              "developerName": "QwIT-Development",
+              "version": $tag,
+              "versionDate": $date,
+              "versionDescription": $desc,
+              "downloadURL": $url,
+              "localizedDescription": "Firka App",
+              "iconURL": "https://github.com/QwIT-Development/app-legacy/blob/master/refilc/assets/icons/ic_android.png?raw=true",
+              "tintColor": "018084",
+              "isLanZouCloud": 0,
+              "size": ($size | tonumber),
+              "type": 1
+            }' > new_app.json
           
           # Merge the new app into apps.json
           jq -s '.[0].apps = ([.[1]] + .[0].apps) | .[0]' apps.json new_app.json > apps.json.tmp
