@@ -1,0 +1,119 @@
+name: Monitor IPA Repository Releases
+
+on:
+  schedule:
+    # Check every 15 minutes
+    - cron: '*/15 * * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  check-ipa-releases:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          repository: 'spitkov/firkarepo'
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for new IPA releases
+        id: check_releases
+        env:
+          OWNER: 'spitkov'
+          REPO: 'firkatest'
+        run: |
+          # Get the latest release from the repository
+          LATEST_RELEASE=$(curl -s "https://api.github.com/repos/$OWNER/$REPO/releases/latest")
+          
+          # Extract release information
+          TAG_NAME=$(echo $LATEST_RELEASE | jq -r .tag_name)
+          PUBLISHED_AT=$(echo $LATEST_RELEASE | jq -r .published_at)
+          BODY=$(echo $LATEST_RELEASE | jq -r .body)
+          
+          # Find IPA asset
+          IPA_ASSET=$(echo $LATEST_RELEASE | jq -r '.assets[] | select(.name | endswith(".ipa"))')
+          
+          if [ -n "$IPA_ASSET" ]; then
+            # Extract IPA information
+            DOWNLOAD_URL=$(echo $IPA_ASSET | jq -r .browser_download_url)
+            SIZE=$(echo $IPA_ASSET | jq -r .size)
+            
+            # Convert size to MB and round to 2 decimal places
+            SIZE_MB=$(echo "scale=2; $SIZE/1048576" | bc)
+            
+            # Format date for version date
+            VERSION_DATE=$(date -d "$PUBLISHED_AT" +"%Y-%m-%dT%H:%M:%S%z")
+            
+            # Store the information
+            echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+            echo "published=$VERSION_DATE" >> $GITHUB_OUTPUT
+            echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+            echo "size=$SIZE_MB" >> $GITHUB_OUTPUT
+            echo "description=$BODY" >> $GITHUB_OUTPUT
+            
+            # Check if this is a new version
+            if [ ! -f .last_processed_ipa ]; then
+              echo $TAG_NAME > .last_processed_ipa
+              echo "is_new=true" >> $GITHUB_OUTPUT
+            else
+              LAST_PROCESSED=$(cat .last_processed_ipa)
+              if [ "$TAG_NAME" != "$LAST_PROCESSED" ]; then
+                echo "New IPA release detected!"
+                echo "is_new=true" >> $GITHUB_OUTPUT
+                echo $TAG_NAME > .last_processed_ipa
+              else
+                echo "No new IPA release"
+                echo "is_new=false" >> $GITHUB_OUTPUT
+              fi
+            fi
+          else
+            echo "No IPA asset found in release"
+            echo "is_new=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update apps.json
+        if: steps.check_releases.outputs.is_new == 'true'
+        run: |
+          # Read existing JSON file
+          if [ ! -f apps.json ]; then
+            # Create initial JSON structure if file doesn't exist
+            echo '{
+              "name": "Firka",
+              "identifier": "app.firka.legacy",
+              "sourceURL": "https://git.spitkov.hu/spitkov/firkaipa",
+              "apps": []
+            }' > apps.json
+          fi
+          
+          # Create new app entry
+          NEW_APP=$(cat << EOF
+          {
+            "name": "Firka",
+            "bundleIdentifier": "app.firka.legacy",
+            "developerName": "QwIT-Development",
+            "version": "${{ steps.check_releases.outputs.tag }}",
+            "versionDate": "${{ steps.check_releases.outputs.published }}",
+            "versionDescription": "${{ steps.check_releases.outputs.description }}",
+            "downloadURL": "${{ steps.check_releases.outputs.download_url }}",
+            "localizedDescription": "Firka App",
+            "iconURL": "https://github.com/QwIT-Development/app-legacy/blob/master/refilc/assets/icons/ic_android.png?raw=true",
+            "tintColor": "018084",
+            "isLanZouCloud": 0,
+            "size": ${{ steps.check_releases.outputs.size }},
+            "type": 1
+          }
+          EOF
+          )
+          
+          # Add new app to the beginning of the apps array
+          jq --arg new_app "$NEW_APP" '.apps = ([($new_app | fromjson)] + .apps)' apps.json > apps.json.tmp
+          mv apps.json.tmp apps.json
+
+      - name: Commit and push if changed
+        if: steps.check_releases.outputs.is_new == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add apps.json
+          git commit -m "Update apps.json with new IPA release ${{ steps.check_releases.outputs.tag }}" || exit 0
+          git push 
