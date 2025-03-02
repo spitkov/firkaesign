@@ -84,42 +84,30 @@ jobs:
 
       - name: Update apps.json
         if: steps.check_releases.outputs.is_new == 'true'
-        shell: bash
         run: |
-          # Read existing JSON file
+          # Create initial JSON if it doesn't exist
           if [ ! -f apps.json ]; then
-            # Create initial JSON structure if file doesn't exist
-            echo '{
-              "name": "Firka",
-              "identifier": "app.firka.legacy",
-              "sourceURL": "https://git.spitkov.hu/spitkov/firkaipa",
-              "apps": []
-            }' > apps.json
+            echo '{"name":"Firka","identifier":"app.firka.legacy","sourceURL":"https://git.spitkov.hu/spitkov/firkaipa","apps":[]}' > apps.json
           fi
           
-          # Create new app entry using jq to ensure proper JSON formatting
-          jq -n --arg tag "v5.1.5" \
-             --arg date "2025-02-28T16:03:26+0000" \
-             --arg desc "## Változások\r\n*` reFilc feliratok átírva Firkára\r\n*` Firkát mutat az app az előzményekben (#5)\r\n+` Törölhető feladatok (nyomd hosszan)\r\n+` Új színek\r\n+` Anoním mód téma megosztásnál (nevedet \"Anonymous\"-ra állítja)\r\n+` IPhone telefon crash javítva (#6)\r\n*` Kicsit optimizáltabb témák és jegyzetek oldal\r\n-` Néhány fölösleges betűtípus eltávolítva (Google Fonts csomag leváltja)\r\n-` Fölösleges képek eltávolítva\r\n*` Meglepetés jegy animáció picit meggyorsítva\r\n-` Rive és Lottie animáció libek eltávolítva (kisebb méret)\r\n\r\n#5 -> @jkacsa01\r\n#6 -> @THE-SIMPLE-MARK \r\n\r\n**Teljes commit lista**: https://github.com/QwIT-Development/app-legacy/compare/v5.1.4...v5.1.5\r\n\r\n**IPA telepítés**:\r\n- [Esign](https://github.com/iOS17/Esign)\r\n- [AltStore](https://altstore.io/#Downloads)\r\n\r\n**[F-Droid repo](https://fdroid.qwit.cloud/repo/?fingerprint=62F5F6410F587AF55BDB2BB86E15796F81322DD506011830E4595E83BD5BF87F)**\r\nAjánlott F-Droid kliens: [Droid-ify](https://github.com/Droid-ify/client/releases/latest)" \
-             --arg url "https://github.com/QwIT-Development/app-legacy/releases/download/v5.1.5/firkaapp.ipa" \
-             --arg size "34.36" \
-             '{
-               "name": "Firka",
-               "bundleIdentifier": "app.firka.legacy",
-               "developerName": "QwIT-Development",
-               "version": $tag,
-               "versionDate": $date,
-               "versionDescription": $desc,
-               "downloadURL": $url,
-               "localizedDescription": "Firka App",
-               "iconURL": "https://github.com/QwIT-Development/app-legacy/blob/master/refilc/assets/icons/ic_android.png?raw=true",
-               "tintColor": "018084",
-               "isLanZouCloud": 0,
-               "size": ($size | tonumber),
-               "type": 1
-             }' > new_app.json
+          # Create new app entry
+          echo '{
+            "name": "Firka",
+            "bundleIdentifier": "app.firka.legacy",
+            "developerName": "QwIT-Development",
+            "version": "${{ steps.check_releases.outputs.tag }}",
+            "versionDate": "${{ steps.check_releases.outputs.published }}",
+            "versionDescription": ${{ steps.check_releases.outputs.description }},
+            "downloadURL": "${{ steps.check_releases.outputs.download_url }}",
+            "localizedDescription": "Firka App",
+            "iconURL": "https://github.com/QwIT-Development/app-legacy/blob/master/refilc/assets/icons/ic_android.png?raw=true",
+            "tintColor": "018084",
+            "isLanZouCloud": 0,
+            "size": ${{ steps.check_releases.outputs.size }},
+            "type": 1
+          }' > new_app.json
           
-          # Add new app to the beginning of the apps array
+          # Merge the new app into apps.json
           jq -s '.[0].apps = ([.[1]] + .[0].apps) | .[0]' apps.json new_app.json > apps.json.tmp
           mv apps.json.tmp apps.json
           rm new_app.json
